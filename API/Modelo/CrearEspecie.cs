@@ -1,6 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
-namespace API.Modelo
+namespace TuProyecto.Models
 {
     public class CrearEspecie
     {
@@ -10,12 +10,12 @@ namespace API.Modelo
         [StringLength(40)]
         public string NombreEspecie { get; set; }
 
-        public int TdsSeguro { get; set; }
-        public int TdsPeligroso { get; set; }
-        public int TemperaturaSeguro { get; set; }
-        public int TemperaturaPeligroso { get; set; }
-        public int PhSeguro { get; set; }
-        public int PhPeligroso { get; set; }
+        public float TdsMinimo { get; set; }
+        public float TdsMaximo { get; set; }
+        public float TemperaturaMinimo { get; set; }
+        public float TemperaturaMaximo { get; set; }
+        public float PhMinimo { get; set; }
+        public float PhMaximo { get; set; }
     }
 }
 
