@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Cors;
 using API.Modelo;
 using System.Threading;
 
+
 namespace API.Controllers
 {
     [ApiController]
@@ -28,18 +29,26 @@ namespace API.Controllers
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Leer")]
-        public IActionResult Leer()
+        public IActionResult Leer(int? id_m = null)  // Parámetro opcional para filtrar por ID_M
         {
             List<Monitoreo> lista = new List<Monitoreo>();
+
             try
             {
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    var cmd = new SqlCommand("ListarMonitoreo", conexion)
+                    var cmd = new SqlCommand("ListarMonitoreos", conexion)
                     {
                         CommandType = CommandType.StoredProcedure
                     };
+
+                    // Agregar el parámetro @ID_M si se especifica
+                    if (id_m.HasValue)
+                    {
+                        cmd.Parameters.AddWithValue("@ID_M", id_m.Value);
+                    }
+
                     using (var rd = cmd.ExecuteReader())
                     {
                         while (rd.Read())
@@ -56,6 +65,7 @@ namespace API.Controllers
                         }
                     }
                 }
+
                 return StatusCode(StatusCodes.Status200OK, new { mensaje = "ok", response = lista });
             }
             catch (Exception error)
@@ -169,4 +179,3 @@ namespace API.Controllers
         }
     }
 }
-
