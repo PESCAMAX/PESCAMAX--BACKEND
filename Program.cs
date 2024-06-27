@@ -59,6 +59,9 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+// Register EmailService
+builder.Services.AddScoped<IEmailService, EmailService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
