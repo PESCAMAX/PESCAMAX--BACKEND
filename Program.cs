@@ -3,8 +3,11 @@ using API.Modelo;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using static API.Controllers.MonitoreoController;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,6 +64,11 @@ builder.Services.AddAuthentication(options =>
 
 // Register EmailService
 builder.Services.AddScoped<IEmailService, EmailService>();
+
+// Register DataFetcherService
+builder.Services.AddHttpClient();
+builder.Services.AddHostedService<DataFetcherService>();
+builder.Services.AddScoped<IDataService, DataService>();
 
 var app = builder.Build();
 

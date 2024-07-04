@@ -6,6 +6,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Threading.Tasks;
 
 namespace API.Controllers
@@ -31,18 +32,17 @@ namespace API.Controllers
                 var commandText = "EXEC spCrearAlerta @especieID, @Nombre, @loteID, @descripcion";
                 var parameters = new[]
                 {
-                    new SqlParameter("@especieID", alerta.EspecieID),
-                    new SqlParameter("@Nombre", alerta.Nombre),
-                    new SqlParameter("@loteID", alerta.LoteID),
-                    new SqlParameter("@descripcion", alerta.Descripcion)
-                };
-
+            new SqlParameter("@especieID", SqlDbType.Int) { Value = alerta.EspecieID },
+            new SqlParameter("@Nombre", SqlDbType.NVarChar, 100) { Value = alerta.Nombre },
+            new SqlParameter("@loteID", SqlDbType.Int) { Value = alerta.LoteID },
+            new SqlParameter("@descripcion", SqlDbType.NVarChar, -1) { Value = alerta.Descripcion }
+        };
                 await _context.Database.ExecuteSqlRawAsync(commandText, parameters);
                 return Ok(alerta);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest($"Error detallado: {ex.Message}\nStack Trace: {ex.StackTrace}");
             }
         }
 
