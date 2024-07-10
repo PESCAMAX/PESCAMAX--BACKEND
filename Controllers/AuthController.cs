@@ -10,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using API.Models;
+
 
 
 namespace API.Controllers
@@ -22,14 +22,19 @@ namespace API.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
+        private readonly IAuthService _authService;
 
-        public AuthController(UserManager<ApplicationUser> userManager, IConfiguration configuration, IEmailService emailService)
+        public AuthController(
+            UserManager<ApplicationUser> userManager,
+            IConfiguration configuration,
+            IEmailService emailService,
+            IAuthService authService)
         {
             _userManager = userManager;
             _configuration = configuration;
             _emailService = emailService;
+            _authService = authService;
         }
-
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
@@ -94,13 +99,11 @@ namespace API.Controllers
                 var user = await _userManager.FindByEmailAsync(model.Email);
                 if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
                 {
-                    // No revelar que el usuario no existe o no está confirmado
                     return BadRequest(new { message = "El usuario no existe o no está confirmado." });
                 }
 
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-
-                var callbackUrl = Url.Action("ResetPassword", "Auth", new { token, email = user.Email }, protocol: HttpContext.Request.Scheme);
+                var callbackUrl = $"http://localhost:4200/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email)}";
 
                 var message = $"Por favor restablezca su contraseña haciendo clic en el siguiente enlace: <a href='{callbackUrl}'>link</a>";
                 await _emailService.SendEmailAsync(model.Email, "Restablecer contraseña", message);
@@ -111,33 +114,38 @@ namespace API.Controllers
             return BadRequest(new { message = "Solicitud inválida." });
         }
 
+
         [HttpPost("reset-password")]
-        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordModel model)
+        public async Task<IActionResult> ResetPassword(ResetPasswordModel model)
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(new { message = "Solicitud inválida", errors = ModelState });
+                return BadRequest(new { message = "Solicitud inválida.", errors = ModelState.Values.SelectMany(v => v.Errors) });
             }
 
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null)
             {
-                return BadRequest(new { message = "Usuario no encontrado" });
+                return BadRequest(new { message = "El usuario no existe." });
             }
 
             var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
             if (result.Succeeded)
             {
-                return Ok(new { message = "Contraseña restablecida exitosamente" });
+                return Ok(new { message = "Contraseña restablecida exitosamente." });
+            }
+            else
+            {
+                foreach (var error in result.Errors)
+                {
+                    Console.WriteLine($"Error Code: {error.Code}, Description: {error.Description}");
+                }
             }
 
-            var errors = result.Errors.Select(e => e.Description).ToList();
-            return BadRequest(new { message = "Error al restablecer la contraseña", errors });
+            return BadRequest(new { message = "No se pudo restablecer la contraseña.", errors = result.Errors });
         }
     }
 }
-
-
 
 
 
