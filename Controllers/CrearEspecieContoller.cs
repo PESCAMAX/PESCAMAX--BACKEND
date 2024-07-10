@@ -1,19 +1,19 @@
 using API.Modelo;
 using Microsoft.AspNetCore.Mvc;
-using System.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Cors;
-using TuProyecto.Models;
 
 namespace API.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/[controller]")]
     public class CrearEspecieController : ControllerBase
     {
         private readonly string _cadenaSQL;
@@ -38,7 +38,7 @@ namespace API.Controllers
                     conexion.Open();
                     using (var transaction = conexion.BeginTransaction())
                     {
-                        var cmd = new SqlCommand("sp_crear_especie", conexion, transaction)
+                        var cmd = new SqlCommand("crear_especie", conexion, transaction)
                         {
                             CommandType = CommandType.StoredProcedure
                         };
@@ -50,36 +50,41 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", crearEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", crearEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", crearEspecie.PhMaximo);
+                        cmd.Parameters.AddWithValue("@UserId", crearEspecie.UserId); // Asegúrate de recibir el UserId
 
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
                         transaction.Commit();
                     }
                 }
-
-                return StatusCode(StatusCodes.Status200OK, new { mensaje = "Especie creada correctamente." });
+                return Ok(new { mensaje = "Especie creada correctamente" });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                _logger.LogError($"Error en Crear: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
+                _logger.LogError(ex, "Error al crear especie");
+                return StatusCode(500, new { mensaje = "Error interno del servidor" });
             }
         }
         #endregion
+    
 
-        #region Modificar especie
-        [HttpPut]
+
+
+
+[HttpPut]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Modificar")]
         public async Task<IActionResult> Modificar([FromBody] CrearEspecie modificarEspecie)
         {
             try
             {
+                string userId = User.FindFirst("UserId")?.Value; // Suponiendo que UserId está en el Claims del token
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
                     using (var transaction = conexion.BeginTransaction())
                     {
-                        var cmd = new SqlCommand("sp_modificar_especie", conexion, transaction)
+                        var cmd = new SqlCommand("modificar_especie", conexion, transaction)
                         {
                             CommandType = CommandType.StoredProcedure
                         };
@@ -91,6 +96,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", modificarEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", modificarEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", modificarEspecie.PhMaximo);
+                        cmd.Parameters.AddWithValue("@UserId", userId); // Añade el UserId aquí
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -105,9 +111,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-        #endregion
 
-        #region Eliminar especie
         [HttpDelete]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Eliminar/{id}")]
@@ -115,16 +119,19 @@ namespace API.Controllers
         {
             try
             {
+                string userId = User.FindFirst("UserId")?.Value; // Suponiendo que UserId está en el Claims del token
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
                     using (var transaction = conexion.BeginTransaction())
                     {
-                        var cmd = new SqlCommand("sp_eliminar_especie", conexion, transaction)
+                        var cmd = new SqlCommand("eliminar_especie", conexion, transaction)
                         {
                             CommandType = CommandType.StoredProcedure
                         };
                         cmd.Parameters.AddWithValue("@Id", id);
+                        cmd.Parameters.AddWithValue("@UserId", userId); // Añade el UserId aquí
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -139,9 +146,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-        #endregion
 
-        #region Listar especie
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Listar")]
@@ -154,7 +159,7 @@ namespace API.Controllers
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    var cmd = new SqlCommand("sp_listar_especies", conexion)
+                    var cmd = new SqlCommand("listar_especies", conexion)
                     {
                         CommandType = CommandType.StoredProcedure
                     };
@@ -187,6 +192,5 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-        #endregion
     }
 }

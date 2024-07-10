@@ -10,11 +10,11 @@ using Microsoft.AspNetCore.Cors;
 using API.Modelo;
 using System.Threading;
 using Newtonsoft.Json;
-using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Security.Claims;
 
 namespace API.Controllers
 {
@@ -33,6 +33,12 @@ namespace API.Controllers
             _serviceProvider = serviceProvider;
         }
 
+        // Método para obtener el ID del usuario actual
+        private string GetUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier);
+        }
+
         #region Listar
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
@@ -46,12 +52,13 @@ namespace API.Controllers
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    var cmd = new SqlCommand("ListarMonitoreos", conexion)
+                    var cmd = new SqlCommand("ListarMonitoreo", conexion)
                     {
                         CommandType = CommandType.StoredProcedure
                     };
 
-                    // Agregar el parámetro @ID_M si se especifica
+                    cmd.Parameters.AddWithValue("@UserId", GetUserId());
+
                     if (id_m.HasValue)
                     {
                         cmd.Parameters.AddWithValue("@ID_M", id_m.Value);
@@ -68,7 +75,8 @@ namespace API.Controllers
                                 Temperatura = Convert.ToSingle(rd["Temperatura"]),
                                 PH = Convert.ToSingle(rd["PH"]),
                                 FechaHora = Convert.ToDateTime(rd["FechaHora"]),
-                                LoteID = Convert.ToInt32(rd["LoteID"])
+                                LoteID = Convert.ToInt32(rd["LoteID"]),
+                                UserId = rd["UserId"].ToString()
                             });
                         }
                     }
@@ -92,6 +100,7 @@ namespace API.Controllers
         {
             try
             {
+                monitoreo.UserId = GetUserId();
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -105,6 +114,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
                         cmd.Parameters.AddWithValue("@LoteID", monitoreo.LoteID);
+                        cmd.Parameters.AddWithValue("@UserId", monitoreo.UserId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -129,6 +139,7 @@ namespace API.Controllers
         {
             try
             {
+                monitoreo.UserId = GetUserId();
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -143,6 +154,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
                         cmd.Parameters.AddWithValue("@LoteID", monitoreo.LoteID);
+                        cmd.Parameters.AddWithValue("@UserId", monitoreo.UserId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -177,6 +189,7 @@ namespace API.Controllers
                             CommandType = CommandType.StoredProcedure
                         };
                         cmd.Parameters.AddWithValue("@ID_M", id_m);
+                        cmd.Parameters.AddWithValue("@UserId", GetUserId());
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -210,6 +223,8 @@ namespace API.Controllers
                     var sensorData = JsonConvert.DeserializeObject<Monitoreo>(responseBody);
                     _logger.LogInformation($"Datos deserializados: Temperatura={sensorData.Temperatura}, tds={sensorData.tds}, PH={sensorData.PH}, loteID={sensorData.LoteID}");
 
+                    sensorData.UserId = GetUserId(); // Asignar el UserId al objeto deserializado
+
                     GuardarEnBaseDeDatos(sensorData);
                 }
 
@@ -238,8 +253,9 @@ namespace API.Controllers
                     cmd.Parameters.AddWithValue("@tds", datosSensor.tds);
                     cmd.Parameters.AddWithValue("@PH", datosSensor.PH);
                     cmd.Parameters.AddWithValue("@loteID", datosSensor.LoteID);
+                    cmd.Parameters.AddWithValue("@UserId", datosSensor.UserId); // Añadir el UserId al procedimiento almacenado
 
-                    _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}");
+                    _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.UserId}");
 
                     cmd.ExecuteNonQuery();
                 }
@@ -331,8 +347,9 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@tds", datosSensor.tds);
                         cmd.Parameters.AddWithValue("@PH", datosSensor.PH);
                         cmd.Parameters.AddWithValue("@loteID", datosSensor.LoteID);
+                        cmd.Parameters.AddWithValue("@UserId", datosSensor.UserId); // Añadir el UserId al procedimiento almacenado
 
-                        _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}");
+                        _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.UserId}");
 
                         cmd.ExecuteNonQuery();
                     }
