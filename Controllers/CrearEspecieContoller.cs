@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Cors;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API.Controllers
 {
@@ -26,6 +28,7 @@ namespace API.Controllers
         }
 
         #region Crear especie
+        [Authorize]
         [HttpPost]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Crear")]
@@ -65,12 +68,12 @@ namespace API.Controllers
             }
         }
         #endregion
-    
 
 
 
 
-[HttpPut]
+        [Authorize]
+        [HttpPut]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Modificar")]
         public async Task<IActionResult> Modificar([FromBody] CrearEspecie modificarEspecie)
@@ -111,7 +114,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-
+        [Authorize]
         [HttpDelete]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Eliminar/{id}")]
@@ -146,16 +149,20 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-
+        [Authorize]
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Listar")]
-        public async Task<IActionResult> Listar()
+        public IActionResult Listar()
         {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
             try
             {
-                var especies = new List<CrearEspecie>();
-
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -163,12 +170,14 @@ namespace API.Controllers
                     {
                         CommandType = CommandType.StoredProcedure
                     };
+                    cmd.Parameters.AddWithValue("@UserId", userId);
 
-                    using (var reader = await cmd.ExecuteReaderAsync())
+                    var especies = new List<CrearEspecie>();
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        while (await reader.ReadAsync())
+                        while (reader.Read())
                         {
-                            var especie = new CrearEspecie
+                            especies.Add(new CrearEspecie
                             {
                                 Id = reader.GetInt32(0),
                                 NombreEspecie = reader.GetString(1),
@@ -178,13 +187,12 @@ namespace API.Controllers
                                 TemperaturaMaximo = (float)reader.GetDouble(5),
                                 PhMinimo = (float)reader.GetDouble(6),
                                 PhMaximo = (float)reader.GetDouble(7)
-                            };
-                            especies.Add(especie);
+                            });
                         }
                     }
-                }
 
-                return Ok(especies);
+                    return Ok(especies);
+                }
             }
             catch (Exception error)
             {
@@ -194,3 +202,4 @@ namespace API.Controllers
         }
     }
 }
+

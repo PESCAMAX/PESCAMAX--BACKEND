@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API.Controllers
 {
@@ -39,13 +40,16 @@ namespace API.Controllers
             return User.FindFirstValue(ClaimTypes.NameIdentifier);
         }
 
-        #region Listar
+        #region
+        [Authorize]
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Leer")]
-        public IActionResult Leer(int? id_m = null)  // Parámetro opcional para filtrar por ID_M
+        public IActionResult Leer(int? id_m = null)
         {
             List<Monitoreo> lista = new List<Monitoreo>();
+            var userId = GetUserId();
+            _logger.LogInformation($"Iniciando Leer con UserId: {userId} y ID_M: {id_m}");
 
             try
             {
@@ -57,18 +61,20 @@ namespace API.Controllers
                         CommandType = CommandType.StoredProcedure
                     };
 
-                    cmd.Parameters.AddWithValue("@UserId", GetUserId());
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    _logger.LogInformation($"Parametro UserId: {userId}");
 
                     if (id_m.HasValue)
                     {
                         cmd.Parameters.AddWithValue("@ID_M", id_m.Value);
+                        _logger.LogInformation($"Parametro ID_M: {id_m.Value}");
                     }
 
                     using (var rd = cmd.ExecuteReader())
                     {
                         while (rd.Read())
                         {
-                            lista.Add(new Monitoreo
+                            var monitoreo = new Monitoreo
                             {
                                 ID_M = Convert.ToInt32(rd["ID_M"]),
                                 tds = Convert.ToSingle(rd["tds"]),
@@ -77,22 +83,27 @@ namespace API.Controllers
                                 FechaHora = Convert.ToDateTime(rd["FechaHora"]),
                                 LoteID = Convert.ToInt32(rd["LoteID"]),
                                 UserId = rd["UserId"].ToString()
-                            });
+                            };
+                            lista.Add(monitoreo);
+                            _logger.LogInformation($"Monitoreo agregado: {monitoreo.ID_M}");
                         }
                     }
                 }
 
-                return StatusCode(StatusCodes.Status200OK, new { mensaje = "ok", response = lista });
+                return Ok(new { mensaje = "ok", response = lista });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                _logger.LogError($"Error en Leer: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message, response = lista });
+                _logger.LogError($"Error en Leer: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = ex.Message, response = lista });
             }
         }
         #endregion
 
+
+
         #region Crear
+        [Authorize]
         [HttpPost]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Crear")]
@@ -129,9 +140,11 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
+
         #endregion
 
         #region Actualizar
+        [Authorize]
         [HttpPut]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Actualizar")]
@@ -139,7 +152,12 @@ namespace API.Controllers
         {
             try
             {
-                monitoreo.UserId = GetUserId();
+                var userId = GetUserId();
+                if (monitoreo.UserId != userId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new { mensaje = "No tienes permiso para actualizar este monitoreo." });
+                }
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -154,7 +172,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
                         cmd.Parameters.AddWithValue("@LoteID", monitoreo.LoteID);
-                        cmd.Parameters.AddWithValue("@UserId", monitoreo.UserId);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -169,6 +187,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
+
         #endregion
 
         #region Eliminar
@@ -179,6 +198,7 @@ namespace API.Controllers
         {
             try
             {
+                var userId = GetUserId();
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -189,7 +209,7 @@ namespace API.Controllers
                             CommandType = CommandType.StoredProcedure
                         };
                         cmd.Parameters.AddWithValue("@ID_M", id_m);
-                        cmd.Parameters.AddWithValue("@UserId", GetUserId());
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -204,6 +224,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
+
         #endregion
 
         #region Importar Datos
