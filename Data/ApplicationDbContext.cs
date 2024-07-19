@@ -17,6 +17,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Dirección> Direcciones { get; set; }
     public DbSet<MétodoPago> MétodosPago { get; set; }
 
+    // Añadir DbSet para HorasSeleccionadas
+    public DbSet<HorasSeleccionadas> HorasSeleccionadas { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
