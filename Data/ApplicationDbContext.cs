@@ -49,7 +49,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Descripcion).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.Fecha).IsRequired();
+            entity.Property(e => e.FechaCreacion).IsRequired();
         });
 
         // Configuraciones adicionales si es necesario

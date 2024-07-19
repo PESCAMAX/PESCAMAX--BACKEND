@@ -17,10 +17,12 @@ namespace API.Controllers
     public class AlertaController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<AlertaController> _logger;
 
-        public AlertaController(ApplicationDbContext context)
+        public AlertaController(ApplicationDbContext context, ILogger<AlertaController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -29,36 +31,53 @@ namespace API.Controllers
         {
             try
             {
-                var commandText = "EXEC spCrearAlerta @especieID, @Nombre, @loteID, @descripcion";
+                if (alerta.FechaCreacion == DateTime.MinValue)
+                {
+                    alerta.FechaCreacion = DateTime.Now;
+                }
+
+                var commandText = "EXEC spCrearAlerta @EspecieID, @Nombre, @LoteID, @Descripcion, @FechaCreacion, @UserId";
                 var parameters = new[]
                 {
-            new SqlParameter("@especieID", SqlDbType.Int) { Value = alerta.EspecieID },
+            new SqlParameter("@EspecieID", SqlDbType.Int) { Value = alerta.EspecieID },
             new SqlParameter("@Nombre", SqlDbType.NVarChar, 100) { Value = alerta.Nombre },
-            new SqlParameter("@loteID", SqlDbType.Int) { Value = alerta.LoteID },
-            new SqlParameter("@descripcion", SqlDbType.NVarChar, -1) { Value = alerta.Descripcion }
+            new SqlParameter("@LoteID", SqlDbType.Int) { Value = alerta.LoteID },
+            new SqlParameter("@Descripcion", SqlDbType.NVarChar, -1) { Value = alerta.Descripcion },
+            new SqlParameter("@FechaCreacion", SqlDbType.DateTime) { Value = alerta.FechaCreacion },
+            new SqlParameter("@UserId", SqlDbType.NVarChar, 450) { Value = alerta.UserId }
         };
                 await _context.Database.ExecuteSqlRawAsync(commandText, parameters);
                 return Ok(alerta);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al crear alerta");
                 return BadRequest($"Error detallado: {ex.Message}\nStack Trace: {ex.StackTrace}");
             }
         }
 
+
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
-        public async Task<ActionResult<IEnumerable<Alerta>>> ObtenerAlertas()
+        public async Task<IActionResult> ObtenerAlertas(string userId)
         {
+            if (string.IsNullOrEmpty(userId))
+            {
+                return BadRequest("UserId is required");
+            }
             try
             {
-                var alertas = await _context.Alertas.FromSqlRaw("EXEC spObtenerAlertas").ToListAsync();
+                var commandText = "EXEC spObtenerAlertas @UserId";
+                var parameter = new SqlParameter("@UserId", SqlDbType.NVarChar, 450) { Value = userId };
+                var alertas = await _context.Alertas.FromSqlRaw(commandText, parameter).ToListAsync();
                 return Ok(alertas);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                _logger.LogError(ex, "Error al obtener alertas");
+                return StatusCode(500, "Error interno del servidor");
             }
         }
+
     }
 }
