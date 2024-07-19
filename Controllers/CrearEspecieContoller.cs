@@ -8,12 +8,14 @@ using System.Data;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Cors;
-using TuProyecto.Models;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace API.Controllers
 {
+    [Authorize]
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/[controller]")]
     public class CrearEspecieController : ControllerBase
     {
         private readonly string _cadenaSQL;
@@ -25,20 +27,24 @@ namespace API.Controllers
             _logger = logger;
         }
 
-        #region Crear especie
-        [HttpPost]
+        [HttpPost("Crear")]
         [EnableCors("AllowSpecificOrigin")]
-        [Route("Crear")]
         public async Task<IActionResult> Crear([FromBody] CrearEspecie crearEspecie)
         {
             try
             {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized();
+                }
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
-                    conexion.Open();
+                    await conexion.OpenAsync();
                     using (var transaction = conexion.BeginTransaction())
                     {
-                        var cmd = new SqlCommand("sp_crear_especie", conexion, transaction)
+                        var cmd = new SqlCommand("crear_especie", conexion, transaction)
                         {
                             CommandType = CommandType.StoredProcedure
                         };
@@ -50,36 +56,39 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", crearEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", crearEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", crearEspecie.PhMaximo);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
                         transaction.Commit();
                     }
                 }
-
-                return StatusCode(StatusCodes.Status200OK, new { mensaje = "Especie creada correctamente." });
+                return Ok(new { mensaje = "Especie creada correctamente" });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                _logger.LogError($"Error en Crear: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
+                _logger.LogError(ex, "Error al crear especie");
+                return StatusCode(500, new { mensaje = "Error interno del servidor" });
             }
         }
-        #endregion
 
-        #region Modificar especie
-        [HttpPut]
+        [HttpPut("Modificar")]
         [EnableCors("AllowSpecificOrigin")]
-        [Route("Modificar")]
         public async Task<IActionResult> Modificar([FromBody] CrearEspecie modificarEspecie)
         {
             try
             {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized();
+                }
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
-                    conexion.Open();
+                    await conexion.OpenAsync();
                     using (var transaction = conexion.BeginTransaction())
                     {
-                        var cmd = new SqlCommand("sp_modificar_especie", conexion, transaction)
+                        var cmd = new SqlCommand("modificar_especie", conexion, transaction)
                         {
                             CommandType = CommandType.StoredProcedure
                         };
@@ -91,79 +100,88 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", modificarEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", modificarEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", modificarEspecie.PhMaximo);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
                         transaction.Commit();
                     }
                 }
 
-                return StatusCode(StatusCodes.Status200OK, new { mensaje = "Especie modificada correctamente." });
+                return Ok(new { mensaje = "Especie modificada correctamente." });
             }
             catch (Exception error)
             {
                 _logger.LogError($"Error en Modificar: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
+                return StatusCode(500, new { mensaje = error.Message });
             }
         }
-        #endregion
 
-        #region Eliminar especie
-        [HttpDelete]
+        [HttpDelete("Eliminar/{id}")]
         [EnableCors("AllowSpecificOrigin")]
-        [Route("Eliminar/{id}")]
-        public IActionResult Eliminar([FromRoute] int id)
+        public async Task<IActionResult> Eliminar(int id)
         {
             try
             {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized();
+                }
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
-                    conexion.Open();
+                    await conexion.OpenAsync();
                     using (var transaction = conexion.BeginTransaction())
                     {
-                        var cmd = new SqlCommand("sp_eliminar_especie", conexion, transaction)
+                        var cmd = new SqlCommand("eliminar_especie", conexion, transaction)
                         {
                             CommandType = CommandType.StoredProcedure
                         };
                         cmd.Parameters.AddWithValue("@Id", id);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
-                        cmd.ExecuteNonQuery();
+                        await cmd.ExecuteNonQueryAsync();
                         transaction.Commit();
                     }
                 }
 
-                return StatusCode(StatusCodes.Status200OK, new { mensaje = "Especie eliminada correctamente." });
+                return Ok(new { mensaje = "Especie eliminada correctamente." });
             }
             catch (Exception error)
             {
                 _logger.LogError($"Error en Eliminar: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
+                return StatusCode(500, new { mensaje = error.Message });
             }
         }
-        #endregion
 
-        #region Listar especie
-        [HttpGet]
+        [HttpGet("Listar")]
         [EnableCors("AllowSpecificOrigin")]
-        [Route("Listar")]
         public async Task<IActionResult> Listar()
         {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            _logger.LogInformation($"UserId received in Listar: {userId}");
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
+
             try
             {
-                var especies = new List<CrearEspecie>();
-
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
-                    conexion.Open();
-                    var cmd = new SqlCommand("sp_listar_especies", conexion)
+                    await conexion.OpenAsync();
+                    var cmd = new SqlCommand("listar_especies", conexion)
                     {
                         CommandType = CommandType.StoredProcedure
                     };
+                    cmd.Parameters.AddWithValue("@UserId", userId);
 
+                    var especies = new List<CrearEspecie>();
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            var especie = new CrearEspecie
+                            especies.Add(new CrearEspecie
                             {
                                 Id = reader.GetInt32(0),
                                 NombreEspecie = reader.GetString(1),
@@ -173,20 +191,18 @@ namespace API.Controllers
                                 TemperaturaMaximo = (float)reader.GetDouble(5),
                                 PhMinimo = (float)reader.GetDouble(6),
                                 PhMaximo = (float)reader.GetDouble(7)
-                            };
-                            especies.Add(especie);
+                            });
                         }
                     }
-                }
 
-                return Ok(especies);
+                    return Ok(especies);
+                }
             }
             catch (Exception error)
             {
                 _logger.LogError($"Error en Listar: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
+                return StatusCode(500, new { mensaje = error.Message });
             }
         }
-        #endregion
     }
 }
