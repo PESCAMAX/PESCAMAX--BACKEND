@@ -10,14 +10,12 @@ using Microsoft.AspNetCore.Cors;
 using API.Modelo;
 using System.Threading;
 using Newtonsoft.Json;
-using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
-using System.Linq;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API.Controllers
 {
@@ -36,58 +34,76 @@ namespace API.Controllers
             _serviceProvider = serviceProvider;
         }
 
-        #region Listar
+        // Método para obtener el ID del usuario actual
+        private string GetUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier);
+        }
+
+        #region
+        [Authorize]
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Leer")]
-        public IActionResult Leer(int? id_m = null)  // Parámetro opcional para filtrar por ID_M
+        public IActionResult Leer(int? id_m = null)
         {
             List<Monitoreo> lista = new List<Monitoreo>();
+            var userId = GetUserId();
+            _logger.LogInformation($"Iniciando Leer con UserId: {userId} y ID_M: {id_m}");
 
             try
             {
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    var cmd = new SqlCommand("ListarMonitoreos", conexion)
+                    var cmd = new SqlCommand("ListarMonitoreo", conexion)
                     {
                         CommandType = CommandType.StoredProcedure
                     };
 
-                    // Agregar el parámetro @ID_M si se especifica
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    _logger.LogInformation($"Parametro UserId: {userId}");
+
                     if (id_m.HasValue)
                     {
                         cmd.Parameters.AddWithValue("@ID_M", id_m.Value);
+                        _logger.LogInformation($"Parametro ID_M: {id_m.Value}");
                     }
 
                     using (var rd = cmd.ExecuteReader())
                     {
                         while (rd.Read())
                         {
-                            lista.Add(new Monitoreo
+                            var monitoreo = new Monitoreo
                             {
                                 ID_M = Convert.ToInt32(rd["ID_M"]),
                                 tds = Convert.ToSingle(rd["tds"]),
                                 Temperatura = Convert.ToSingle(rd["Temperatura"]),
                                 PH = Convert.ToSingle(rd["PH"]),
                                 FechaHora = Convert.ToDateTime(rd["FechaHora"]),
-                                LoteID = Convert.ToInt32(rd["LoteID"])
-                            });
+                                LoteID = Convert.ToInt32(rd["LoteID"]),
+                                UserId = rd["UserId"].ToString()
+                            };
+                            lista.Add(monitoreo);
+                            _logger.LogInformation($"Monitoreo agregado: {monitoreo.ID_M}");
                         }
                     }
                 }
 
-                return StatusCode(StatusCodes.Status200OK, new { mensaje = "ok", response = lista });
+                return Ok(new { mensaje = "ok", response = lista });
             }
-            catch (Exception error)
+            catch (Exception ex)
             {
-                _logger.LogError($"Error en Leer: {error.Message}");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message, response = lista });
+                _logger.LogError($"Error en Leer: {ex.Message}");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = ex.Message, response = lista });
             }
         }
         #endregion
 
+
+
         #region Crear
+        [Authorize]
         [HttpPost]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Crear")]
@@ -95,6 +111,7 @@ namespace API.Controllers
         {
             try
             {
+                monitoreo.UserId = GetUserId();
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -108,6 +125,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
                         cmd.Parameters.AddWithValue("@LoteID", monitoreo.LoteID);
+                        cmd.Parameters.AddWithValue("@UserId", monitoreo.UserId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -122,9 +140,11 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
+
         #endregion
 
         #region Actualizar
+        [Authorize]
         [HttpPut]
         [EnableCors("AllowSpecificOrigin")]
         [Route("Actualizar")]
@@ -132,6 +152,12 @@ namespace API.Controllers
         {
             try
             {
+                var userId = GetUserId();
+                if (monitoreo.UserId != userId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new { mensaje = "No tienes permiso para actualizar este monitoreo." });
+                }
+
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -146,6 +172,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
                         cmd.Parameters.AddWithValue("@LoteID", monitoreo.LoteID);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -160,6 +187,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
+
         #endregion
 
         #region Eliminar
@@ -170,6 +198,7 @@ namespace API.Controllers
         {
             try
             {
+                var userId = GetUserId();
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -180,6 +209,7 @@ namespace API.Controllers
                             CommandType = CommandType.StoredProcedure
                         };
                         cmd.Parameters.AddWithValue("@ID_M", id_m);
+                        cmd.Parameters.AddWithValue("@UserId", userId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -194,6 +224,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
+
         #endregion
 
         #region Importar Datos
@@ -212,6 +243,8 @@ namespace API.Controllers
 
                     var sensorData = JsonConvert.DeserializeObject<Monitoreo>(responseBody);
                     _logger.LogInformation($"Datos deserializados: Temperatura={sensorData.Temperatura}, tds={sensorData.tds}, PH={sensorData.PH}, loteID={sensorData.LoteID}");
+
+                    sensorData.UserId = GetUserId(); // Asignar el UserId al objeto deserializado
 
                     GuardarEnBaseDeDatos(sensorData);
                 }
@@ -241,8 +274,9 @@ namespace API.Controllers
                     cmd.Parameters.AddWithValue("@tds", datosSensor.tds);
                     cmd.Parameters.AddWithValue("@PH", datosSensor.PH);
                     cmd.Parameters.AddWithValue("@loteID", datosSensor.LoteID);
+                    cmd.Parameters.AddWithValue("@UserId", datosSensor.UserId); // Añadir el UserId al procedimiento almacenado
 
-                    _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}");
+                    _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.UserId}");
 
                     cmd.ExecuteNonQuery();
                 }
@@ -334,8 +368,9 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@tds", datosSensor.tds);
                         cmd.Parameters.AddWithValue("@PH", datosSensor.PH);
                         cmd.Parameters.AddWithValue("@loteID", datosSensor.LoteID);
+                        cmd.Parameters.AddWithValue("@UserId", datosSensor.UserId); // Añadir el UserId al procedimiento almacenado
 
-                        _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}");
+                        _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.UserId}");
 
                         cmd.ExecuteNonQuery();
                     }
@@ -347,10 +382,5 @@ namespace API.Controllers
             }
         }
         #endregion
-
-
-        
-
-
     }
 }
