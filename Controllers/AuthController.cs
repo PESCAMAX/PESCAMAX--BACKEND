@@ -35,15 +35,15 @@ namespace API.Controllers
             _emailService = emailService;
             _authService = authService;
         }
+
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
-            var user = new ApplicationUser { UserName = model.Username, Email = model.Email, EmailConfirmed = true }; // EmailConfirmed se establece en true
+            var user = new ApplicationUser { UserName = model.Username, Email = model.Email, EmailConfirmed = true };
             var result = await _userManager.CreateAsync(user, model.Password);
 
             if (result.Succeeded)
             {
-                // Generar y almacenar el token
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                 user.Token = token;
                 await _userManager.UpdateAsync(user);
@@ -62,10 +62,10 @@ namespace API.Controllers
             {
                 var claims = new[]
                 {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim("UserId", user.Id) // Añade el UserId a los claims
-        };
+                    new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                    new Claim(ClaimTypes.NameIdentifier, user.Id)
+                };
                 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
                 var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -80,16 +80,12 @@ namespace API.Controllers
                 {
                     success = true,
                     token = new JwtSecurityTokenHandler().WriteToken(token),
-                    userId = user.Id, // Incluye el UserId en la respuesta
+                    userId = user.Id,
                     message = "Login successful"
                 });
             }
 
-            return Unauthorized(new
-            {
-                success = false,
-                message = "Invalid username or password"
-            });
+            return Unauthorized(new { success = false, message = "Invalid username or password" });
         }
 
         [HttpPost("forgot-password")]
