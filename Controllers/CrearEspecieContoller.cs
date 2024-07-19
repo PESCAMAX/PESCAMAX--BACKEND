@@ -156,6 +156,7 @@ namespace API.Controllers
         public IActionResult Listar()
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            _logger.LogInformation($"UserId received in Listar: {userId}");
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized();
