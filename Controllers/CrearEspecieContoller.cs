@@ -83,16 +83,20 @@ namespace API.Controllers
             }
         }
 
-        [HttpPut("Modificar")]
+        [HttpPut("Modificar/{userId}")]
         [EnableCors("AllowSpecificOrigin")]
-        public async Task<IActionResult> Modificar([FromBody] CrearEspecie modificarEspecie)
+        public async Task<IActionResult> Modificar(string userId, [FromBody] CrearEspecie modificarEspecie)
         {
             try
             {
-                var userId = GetUserId();
-                if (string.IsNullOrEmpty(userId))
+                var authenticatedUserId = GetUserId();
+                if (string.IsNullOrEmpty(authenticatedUserId))
                 {
                     return Unauthorized();
+                }
+                if (userId != authenticatedUserId)
+                {
+                    return Forbid();
                 }
 
                 using (var conexion = new SqlConnection(_cadenaSQL))
