@@ -14,8 +14,9 @@ namespace API.Modelo
         public float TemperaturaMaximo { get; set; }
         public float PhMinimo { get; set; }
         public float PhMaximo { get; set; }
-        public string UserId { get; set; } // Propiedad para almacenar UserId
+        public string UserId { get; set; } // Propiedad para almacenar el token del usuario
     }
+
 }
 
 

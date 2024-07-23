@@ -82,7 +82,7 @@ namespace API.Controllers
                                 PH = Convert.ToSingle(rd["PH"]),
                                 FechaHora = Convert.ToDateTime(rd["FechaHora"]),
                                 LoteID = Convert.ToInt32(rd["LoteID"]),
-                                UserId = rd["UserId"].ToString()
+                                userId = rd["UserId"].ToString()
                             };
                             lista.Add(monitoreo);
                             _logger.LogInformation($"Monitoreo agregado: {monitoreo.ID_M}");
@@ -111,7 +111,7 @@ namespace API.Controllers
         {
             try
             {
-                monitoreo.UserId = GetUserId();
+                monitoreo.userId = GetUserId();
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
@@ -125,7 +125,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
                         cmd.Parameters.AddWithValue("@LoteID", monitoreo.LoteID);
-                        cmd.Parameters.AddWithValue("@UserId", monitoreo.UserId);
+                        cmd.Parameters.AddWithValue("@UserId", monitoreo.userId);
 
                         cmd.ExecuteNonQuery();
                         transaction.Commit();
@@ -153,7 +153,7 @@ namespace API.Controllers
             try
             {
                 var userId = GetUserId();
-                if (monitoreo.UserId != userId)
+                if (monitoreo.userId != userId)
                 {
                     return StatusCode(StatusCodes.Status403Forbidden, new { mensaje = "No tienes permiso para actualizar este monitoreo." });
                 }
@@ -228,15 +228,17 @@ namespace API.Controllers
         #endregion
 
         #region Importar Datos
+        [Authorize]
         [HttpGet]
         [Route("ImportarDatos")]
         public async Task<IActionResult> ImportarDatos()
         {
             try
             {
+                var userId = GetUserId();
                 using (HttpClient client = new HttpClient())
                 {
-                    HttpResponseMessage response = await client.GetAsync("http://192.168.20.33/data");
+                    HttpResponseMessage response = await client.GetAsync("http://192.168.149.155/data");
                     response.EnsureSuccessStatusCode();
                     string responseBody = await response.Content.ReadAsStringAsync();
                     _logger.LogInformation($"Datos recibidos del servidor: {responseBody}");
@@ -244,7 +246,7 @@ namespace API.Controllers
                     var sensorData = JsonConvert.DeserializeObject<Monitoreo>(responseBody);
                     _logger.LogInformation($"Datos deserializados: Temperatura={sensorData.Temperatura}, tds={sensorData.tds}, PH={sensorData.PH}, loteID={sensorData.LoteID}");
 
-                    sensorData.UserId = GetUserId(); // Asignar el UserId al objeto deserializado
+                    sensorData.userId = userId; // Assign the current user's ID
 
                     GuardarEnBaseDeDatos(sensorData);
                 }
@@ -258,6 +260,7 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = ex.Message });
             }
         }
+        #endregion
 
         private void GuardarEnBaseDeDatos(Monitoreo datosSensor)
         {
@@ -274,9 +277,9 @@ namespace API.Controllers
                     cmd.Parameters.AddWithValue("@tds", datosSensor.tds);
                     cmd.Parameters.AddWithValue("@PH", datosSensor.PH);
                     cmd.Parameters.AddWithValue("@loteID", datosSensor.LoteID);
-                    cmd.Parameters.AddWithValue("@UserId", datosSensor.UserId); // Añadir el UserId al procedimiento almacenado
+                    cmd.Parameters.AddWithValue("@UserId", datosSensor.userId); // Añadir el UserId al procedimiento almacenado
 
-                    _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.UserId}");
+                    _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.userId}");
 
                     cmd.ExecuteNonQuery();
                 }
@@ -286,58 +289,14 @@ namespace API.Controllers
                 }
             }
         }
-        #endregion
+
 
         #region Servicio de fondo
-        public class DataFetcherService : BackgroundService
-        {
-            private readonly ILogger<DataFetcherService> _logger;
-            private readonly IHttpClientFactory _httpClientFactory;
-            private readonly IServiceProvider _serviceProvider;
+       
+            #endregion
 
-            public DataFetcherService(ILogger<DataFetcherService> logger, IHttpClientFactory httpClientFactory, IServiceProvider serviceProvider)
-            {
-                _logger = logger;
-                _httpClientFactory = httpClientFactory;
-                _serviceProvider = serviceProvider;
-            }
-
-            protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-            {
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    try
-                    {
-                        using (var scope = _serviceProvider.CreateScope())
-                        {
-                            var client = _httpClientFactory.CreateClient();
-                            HttpResponseMessage response = await client.GetAsync("http://192.168.43.110/data");
-                            response.EnsureSuccessStatusCode();
-                            string responseBody = await response.Content.ReadAsStringAsync();
-                            _logger.LogInformation($"Datos recibidos del servidor: {responseBody}");
-
-                            var sensorData = JsonConvert.DeserializeObject<Monitoreo>(responseBody);
-                            _logger.LogInformation($"Datos deserializados: Temperatura={sensorData.Temperatura}, tds={sensorData.tds}, PH={sensorData.PH}, loteID={sensorData.LoteID}");
-
-                            var dataService = scope.ServiceProvider.GetRequiredService<IDataService>();
-                            dataService.GuardarEnBaseDeDatos(sensorData);
-                        }
-
-                        _logger.LogInformation("Datos importados correctamente.");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Error al importar datos: {ex.Message}");
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); // Intervalo de 5 minutos
-                }
-            }
-        }
-        #endregion
-
-        #region Servicio de datos
-        public interface IDataService
+            #region Servicio de datos
+            public interface IDataService
         {
             void GuardarEnBaseDeDatos(Monitoreo datosSensor);
         }
@@ -368,9 +327,9 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@tds", datosSensor.tds);
                         cmd.Parameters.AddWithValue("@PH", datosSensor.PH);
                         cmd.Parameters.AddWithValue("@loteID", datosSensor.LoteID);
-                        cmd.Parameters.AddWithValue("@UserId", datosSensor.UserId); // Añadir el UserId al procedimiento almacenado
+                        cmd.Parameters.AddWithValue("@UserId", datosSensor.userId); // Añadir el UserId al procedimiento almacenado
 
-                        _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.UserId}");
+                        _logger.LogInformation($"Insertando datos en la base de datos: Temperatura={datosSensor.Temperatura}, tds={datosSensor.tds}, PH={datosSensor.PH}, loteID={datosSensor.LoteID}, UserId={datosSensor.userId}");
 
                         cmd.ExecuteNonQuery();
                     }

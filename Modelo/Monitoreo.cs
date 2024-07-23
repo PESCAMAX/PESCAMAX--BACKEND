@@ -8,7 +8,7 @@
         public float PH { get; set; }
         public DateTime FechaHora { get; set; }
         public int LoteID { get; set; }
-        public string UserId { get; set; } // Nueva propiedad
+        public string userId { get; set; } // Propiedad para almacenar el token del usuario
     }
 
 }

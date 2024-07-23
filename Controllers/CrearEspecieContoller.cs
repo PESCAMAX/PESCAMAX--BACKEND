@@ -27,18 +27,30 @@ namespace API.Controllers
             _logger = logger;
         }
 
-        [HttpPost("Crear")]
+        private string GetUserId()
+        {
+            return User.FindFirstValue(ClaimTypes.NameIdentifier);
+        }
+
+        [HttpPost("Crear/{userId}")]
         [EnableCors("AllowSpecificOrigin")]
-        public async Task<IActionResult> Crear([FromBody] CrearEspecie crearEspecie)
+        public async Task<IActionResult> Crear(string userId, [FromBody] CrearEspecie crearEspecie)
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(userId))
+                var authenticatedUserId = GetUserId();
+                if (string.IsNullOrEmpty(authenticatedUserId))
                 {
                     return Unauthorized();
                 }
 
+                // Verificar que el userId en la URL coincida con el usuario autenticado
+                if (userId != authenticatedUserId)
+                {
+                    return Forbid();
+                }
+
+                // Resto de la lógica para crear la especie
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     await conexion.OpenAsync();
@@ -56,7 +68,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", crearEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", crearEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", crearEspecie.PhMaximo);
-                        cmd.Parameters.AddWithValue("@UserId", userId);
+                        cmd.Parameters.AddWithValue("@UserId", authenticatedUserId);
 
                         await cmd.ExecuteNonQueryAsync();
                         transaction.Commit();
@@ -77,7 +89,7 @@ namespace API.Controllers
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = GetUserId();
                 if (string.IsNullOrEmpty(userId))
                 {
                     return Unauthorized();
@@ -122,7 +134,7 @@ namespace API.Controllers
         {
             try
             {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = GetUserId();
                 if (string.IsNullOrEmpty(userId))
                 {
                     return Unauthorized();
@@ -154,16 +166,16 @@ namespace API.Controllers
             }
         }
 
-        [HttpGet("Listar")]
+        [HttpGet("Listar/{userId?}")]
         [EnableCors("AllowSpecificOrigin")]
-        public async Task<IActionResult> Listar()
+        public async Task<IActionResult> Listar(string userId = null)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            _logger.LogInformation($"UserId received in Listar: {userId}");
-            if (string.IsNullOrEmpty(userId))
+            var authenticatedUserId = GetUserId();
+            if (string.IsNullOrEmpty(authenticatedUserId))
             {
                 return Unauthorized();
             }
+            userId = userId ?? authenticatedUserId;
 
             try
             {

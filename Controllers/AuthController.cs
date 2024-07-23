@@ -3,15 +3,12 @@ using Microsoft.AspNetCore.Identity;
 using API.Modelo;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using API.Data;
-using System.Linq;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-
-
+using Microsoft.IdentityModel.Tokens;
+using System;
+using API.Data;
 
 namespace API.Controllers
 {
@@ -39,6 +36,11 @@ namespace API.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var user = new ApplicationUser { UserName = model.Username, Email = model.Email, EmailConfirmed = true };
             var result = await _userManager.CreateAsync(user, model.Password);
 
@@ -47,40 +49,30 @@ namespace API.Controllers
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                 user.Token = token;
                 await _userManager.UpdateAsync(user);
-
-                return Ok(new { message = "User registered successfully" });
+                return Ok(new { success = true, message = "User registered successfully" });
             }
 
-            return BadRequest(result.Errors);
+            return BadRequest(new { success = false, errors = result.Errors });
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var user = await _userManager.FindByNameAsync(model.Username);
             if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
             {
-                var claims = new[]
-                {
-                    new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                    new Claim(ClaimTypes.NameIdentifier, user.Id)
-                };
-                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-                var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-                var token = new JwtSecurityToken(
-                    issuer: _configuration["Jwt:Issuer"],
-                    audience: _configuration["Jwt:Audience"],
-                    claims: claims,
-                    expires: DateTime.Now.AddMinutes(30),
-                    signingCredentials: creds);
-
+                var token = await GenerateJwtToken(user);
                 return Ok(new
                 {
                     success = true,
-                    token = new JwtSecurityTokenHandler().WriteToken(token),
+                    token = token,
                     userId = user.Id,
+                    username = user.UserName,
                     message = "Login successful"
                 });
             }
@@ -88,7 +80,33 @@ namespace API.Controllers
             return Unauthorized(new { success = false, message = "Invalid username or password" });
         }
 
-        [HttpPost("forgot-password")]
+        private async Task<string> GenerateJwtToken(ApplicationUser user)
+        {
+            var claims = new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.Name, user.UserName)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var expires = DateTime.Now.AddDays(Convert.ToDouble(_configuration["Jwt:ExpireDays"]));
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: expires,
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+    
+
+[HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword(ForgotPasswordModel model)
         {
             if (ModelState.IsValid)
