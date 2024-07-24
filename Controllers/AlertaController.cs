@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace API.Controllers
@@ -31,6 +33,7 @@ namespace API.Controllers
         {
             try
             {
+                _logger.LogInformation($"Recibiendo alerta: {JsonSerializer.Serialize(alerta)}");
                 if (alerta.FechaCreacion == DateTime.MinValue)
                 {
                     alerta.FechaCreacion = DateTime.Now;
@@ -51,22 +54,23 @@ namespace API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al crear alerta");
+                _logger.LogError(ex, $"Error al crear alerta: {ex.Message}");
                 return BadRequest($"Error detallado: {ex.Message}\nStack Trace: {ex.StackTrace}");
             }
         }
 
-
         [HttpGet]
         [EnableCors("AllowSpecificOrigin")]
-        public async Task<IActionResult> ObtenerAlertas(string userId)
+        public async Task<IActionResult> ObtenerAlertas()
         {
-            if (string.IsNullOrEmpty(userId))
-            {
-                return BadRequest("UserId is required");
-            }
             try
             {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized("Usuario no autenticado");
+                }
+
                 var commandText = "EXEC spObtenerAlertas @UserId";
                 var parameter = new SqlParameter("@UserId", SqlDbType.NVarChar, 450) { Value = userId };
                 var alertas = await _context.Alertas.FromSqlRaw(commandText, parameter).ToListAsync();
@@ -78,6 +82,5 @@ namespace API.Controllers
                 return StatusCode(500, "Error interno del servidor");
             }
         }
-
     }
 }

@@ -4,10 +4,20 @@ using Microsoft.EntityFrameworkCore;
 
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 {
+   
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
     {
     }
+  
+        public DbSet<EspecieLote> EspecieLote { get; set; }
+    public DbSet<CrearEspecie> CrearEspecie { get; set; }
+    // ... otros DbSet ...
+
+
+
+
 
     public DbSet<Alerta> Alertas { get; set; }
     public DbSet<Producto> Productos { get; set; }

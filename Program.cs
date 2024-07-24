@@ -77,6 +77,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Register other services as needed...
+builder.Services.AddScoped<IEspecieLoteService, EspecieLoteService>();
 
 var app = builder.Build();
 
