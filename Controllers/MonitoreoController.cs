@@ -42,6 +42,7 @@ namespace API.Controllers
         }
 
         [HttpGet("Leer/{userId?}")]
+        [EnableCors("AllowSpecificOrigin")]
         public IActionResult Leer(string userId = null)
         {
             List<Monitoreo> lista = new List<Monitoreo>();
@@ -88,6 +89,7 @@ namespace API.Controllers
             }
         }
 
+        [EnableCors("AllowSpecificOrigin")]
         [HttpPost("Crear")]
         public IActionResult Crear([FromBody] Monitoreo monitoreo)
         {
@@ -157,6 +159,7 @@ namespace API.Controllers
         }
 
         [HttpDelete("Eliminar/{id_m}")]
+        [EnableCors("AllowSpecificOrigin")]
         public IActionResult Eliminar(int id_m)
         {
             try
