@@ -16,40 +16,37 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using System;
+using System.Collections.Generic;
 
 namespace API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
+    [EnableCors("AllowSpecificOrigin")]
     public class MonitoreoController : ControllerBase
     {
         private readonly string _cadenaSQL;
         private readonly ILogger<MonitoreoController> _logger;
-        private readonly IServiceProvider _serviceProvider;
 
-        public MonitoreoController(IConfiguration configuration, ILogger<MonitoreoController> logger, IServiceProvider serviceProvider)
+        public MonitoreoController(IConfiguration configuration, ILogger<MonitoreoController> logger)
         {
             _cadenaSQL = configuration.GetConnectionString("DefaultConnection");
             _logger = logger;
-            _serviceProvider = serviceProvider;
         }
 
-        // Método para obtener el ID del usuario actual
         private string GetUserId()
         {
             return User.FindFirstValue(ClaimTypes.NameIdentifier);
         }
 
-        #region
-        [Authorize]
-        [HttpGet]
-        [EnableCors("AllowSpecificOrigin")]
-        [Route("Leer")]
-        public IActionResult Leer(int? id_m = null)
+        [HttpGet("Leer/{userId?}")]
+        public IActionResult Leer(string userId = null)
         {
             List<Monitoreo> lista = new List<Monitoreo>();
-            var userId = GetUserId();
-            _logger.LogInformation($"Iniciando Leer con UserId: {userId} y ID_M: {id_m}");
+            userId = userId ?? GetUserId();
+            _logger.LogInformation($"Iniciando Leer con UserId: {userId}");
 
             try
             {
@@ -62,13 +59,6 @@ namespace API.Controllers
                     };
 
                     cmd.Parameters.AddWithValue("@UserId", userId);
-                    _logger.LogInformation($"Parametro UserId: {userId}");
-
-                    if (id_m.HasValue)
-                    {
-                        cmd.Parameters.AddWithValue("@ID_M", id_m.Value);
-                        _logger.LogInformation($"Parametro ID_M: {id_m.Value}");
-                    }
 
                     using (var rd = cmd.ExecuteReader())
                     {
@@ -85,7 +75,6 @@ namespace API.Controllers
                                 userId = rd["UserId"].ToString()
                             };
                             lista.Add(monitoreo);
-                            _logger.LogInformation($"Monitoreo agregado: {monitoreo.ID_M}");
                         }
                     }
                 }
@@ -98,15 +87,8 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = ex.Message, response = lista });
             }
         }
-        #endregion
 
-
-
-        #region Crear
-        [Authorize]
-        [HttpPost]
-        [EnableCors("AllowSpecificOrigin")]
-        [Route("Crear")]
+        [HttpPost("Crear")]
         public IActionResult Crear([FromBody] Monitoreo monitoreo)
         {
             try
@@ -115,12 +97,9 @@ namespace API.Controllers
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    using (var transaction = conexion.BeginTransaction())
+                    using (var cmd = new SqlCommand("GuardarMonitoreo", conexion))
                     {
-                        var cmd = new SqlCommand("GuardarMonitoreo", conexion, transaction)
-                        {
-                            CommandType = CommandType.StoredProcedure
-                        };
+                        cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@tds", monitoreo.tds);
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
                         cmd.Parameters.AddWithValue("@PH", monitoreo.PH);
@@ -128,7 +107,6 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@UserId", monitoreo.userId);
 
                         cmd.ExecuteNonQuery();
-                        transaction.Commit();
                     }
                 }
 
@@ -141,13 +119,7 @@ namespace API.Controllers
             }
         }
 
-        #endregion
-
-        #region Actualizar
-        [Authorize]
-        [HttpPut]
-        [EnableCors("AllowSpecificOrigin")]
-        [Route("Actualizar")]
+        [HttpPut("Actualizar")]
         public IActionResult Actualizar([FromBody] Monitoreo monitoreo)
         {
             try
@@ -161,12 +133,9 @@ namespace API.Controllers
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    using (var transaction = conexion.BeginTransaction())
+                    using (var cmd = new SqlCommand("ActualizarMonitoreo", conexion))
                     {
-                        var cmd = new SqlCommand("ActualizarMonitoreo", conexion, transaction)
-                        {
-                            CommandType = CommandType.StoredProcedure
-                        };
+                        cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@ID_M", monitoreo.ID_M);
                         cmd.Parameters.AddWithValue("@tds", monitoreo.tds);
                         cmd.Parameters.AddWithValue("@Temperatura", monitoreo.Temperatura);
@@ -175,7 +144,6 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@UserId", userId);
 
                         cmd.ExecuteNonQuery();
-                        transaction.Commit();
                     }
                 }
 
@@ -188,12 +156,7 @@ namespace API.Controllers
             }
         }
 
-        #endregion
-
-        #region Eliminar
-        [HttpDelete]
-        [EnableCors("AllowSpecificOrigin")]
-        [Route("Eliminar/{id_m}")]
+        [HttpDelete("Eliminar/{id_m}")]
         public IActionResult Eliminar(int id_m)
         {
             try
@@ -202,17 +165,13 @@ namespace API.Controllers
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     conexion.Open();
-                    using (var transaction = conexion.BeginTransaction())
+                    using (var cmd = new SqlCommand("EliminarMonitoreo", conexion))
                     {
-                        var cmd = new SqlCommand("EliminarMonitoreo", conexion, transaction)
-                        {
-                            CommandType = CommandType.StoredProcedure
-                        };
+                        cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@ID_M", id_m);
                         cmd.Parameters.AddWithValue("@UserId", userId);
 
                         cmd.ExecuteNonQuery();
-                        transaction.Commit();
                     }
                 }
 
@@ -224,11 +183,9 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-
-        #endregion
-
-        #region Importar Datos
-        [Authorize]
+    
+#region Importar Datos
+[Authorize]
         [HttpGet]
         [Route("ImportarDatos")]
         public async Task<IActionResult> ImportarDatos()
