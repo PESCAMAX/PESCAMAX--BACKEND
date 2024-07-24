@@ -29,7 +29,7 @@ namespace API.Controllers
 
         private string GetUserId()
         {
-            return User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         }
 
         [HttpPost("Crear/{userId}")]
@@ -92,11 +92,13 @@ namespace API.Controllers
                 var authenticatedUserId = GetUserId();
                 if (string.IsNullOrEmpty(authenticatedUserId))
                 {
-                    return Unauthorized();
+                    _logger.LogWarning("Intento de modificación sin autenticación");
+                    return Unauthorized("Usuario no autenticado");
                 }
                 if (userId != authenticatedUserId)
                 {
-                    return Forbid();
+                    _logger.LogWarning($"Intento de modificación con userId no coincidente. Auth: {authenticatedUserId}, Requested: {userId}");
+                    return Forbid("No tienes permiso para modificar esta especie");
                 }
 
                 using (var conexion = new SqlConnection(_cadenaSQL))
