@@ -39,7 +39,32 @@ namespace API.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterModel model)
         {
-            var user = new ApplicationUser { UserName = model.Username, Email = model.Email, EmailConfirmed = true };
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            // Verificar si el usuario ya existe
+            var existingUser = await _userManager.FindByNameAsync(model.Username);
+            if (existingUser != null)
+            {
+                return BadRequest(new { success = false, message = "Este nombre de usuario ya existe. Por favor, elija otro." });
+            }
+
+            // Verificar si el correo ya existe
+            var existingEmail = await _userManager.FindByEmailAsync(model.Email);
+            if (existingEmail != null)
+            {
+                return BadRequest(new { success = false, message = "Este correo electrónico ya está registrado. Por favor, use otro o inicie sesión." });
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = model.Username,
+                Email = model.Email,
+                EmailConfirmed = true,
+                PhoneNumber = model.Phone  // Añadido el número de teléfono
+            };
             var result = await _userManager.CreateAsync(user, model.Password);
 
             if (result.Succeeded)
@@ -47,13 +72,11 @@ namespace API.Controllers
                 var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
                 user.Token = token;
                 await _userManager.UpdateAsync(user);
-
-                return Ok(new { message = "User registered successfully" });
+                return Ok(new { success = true, message = "Usuario registrado exitosamente" });
             }
 
-            return BadRequest(result.Errors);
+            return BadRequest(new { success = false, errors = result.Errors });
         }
-
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
