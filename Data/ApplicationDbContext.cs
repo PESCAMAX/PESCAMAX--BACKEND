@@ -16,9 +16,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Categoría> Categorías { get; set; }
     public DbSet<Dirección> Direcciones { get; set; }
     public DbSet<MétodoPago> MétodosPago { get; set; }
+    public DbSet<HorasSeleccionadas> HorasSeleccionadas { get; set; }
+    public DbSet<Monitoreo> Monitoreo { get; set; }
 
     // Añadir DbSet para HorasSeleccionadas
-    public DbSet<HorasSeleccionadas> HorasSeleccionadas { get; set; }
+    
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,16 +29,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         modelBuilder.Entity<DetalleOrden>()
             .HasKey(d => d.DetalleOrdenId);
 
-        modelBuilder.Entity<Producto>(entity =>
+        modelBuilder.Entity<Monitoreo>(entity =>
         {
-            entity.HasKey(e => e.ProductoId);
-            entity.Property(e => e.Nombre).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Descripción).HasMaxLength(500);
-            entity.Property(e => e.Precio).HasColumnType("decimal(18,2)");
-            entity.Property(e => e.CategoríaId).IsRequired();
-            entity.HasOne(e => e.Categoría)
-                  .WithMany(c => c.Productos)
-                  .HasForeignKey(e => e.CategoríaId);
+            entity.HasKey(e => e.ID_M);
+            entity.Property(e => e.Temperatura).IsRequired();
+            entity.Property(e => e.tds).IsRequired();
+            entity.Property(e => e.PH).IsRequired();
+            entity.Property(e => e.FechaHora).IsRequired();
+            entity.Property(e => e.LoteID).IsRequired();
+            entity.Property(e => e.userId).IsRequired();
         });
 
         modelBuilder.Entity<Categoría>(entity =>

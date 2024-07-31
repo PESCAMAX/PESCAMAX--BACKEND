@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using API.Data;
 using API.Modelo;
 using System.Text;
+using static API.Controllers.MonitoreoController;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,6 +78,8 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Register other services as needed...
+
+builder.Services.AddHostedService<MonitoreoBackgroundService>();
 
 var app = builder.Build();
 
