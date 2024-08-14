@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using API.Data;
 using API.Modelo;
 using System.Text;
+using API.Controllers; // Asegúrate de que este using esté presente
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +21,6 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = null;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -32,7 +32,6 @@ builder.Services.AddCors(options =>
             .WithOrigins("http://localhost:4200")
             .AllowAnyMethod()
             .AllowAnyHeader());
-
     options.AddPolicy("ReglasCors", policy =>
     {
         policy.AllowAnyOrigin()
@@ -44,6 +43,8 @@ builder.Services.AddCors(options =>
 // Database context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddHostedService<MonitoreoController.MonitoreoBackgroundService>();
 
 // Identity configuration
 builder.Services.AddIdentity<API.Modelo.ApplicationUser, IdentityRole>()
@@ -78,6 +79,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Register other services as needed...
 builder.Services.AddScoped<IEspecieLoteService, EspecieLoteService>();
+
+// Add the background service
+builder.Services.AddHostedService<MonitoreoController.MonitoreoBackgroundService>();
 
 var app = builder.Build();
 

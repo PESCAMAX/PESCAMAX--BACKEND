@@ -18,6 +18,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using System;
 using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 
 namespace API.Controllers
 {
@@ -186,9 +187,9 @@ namespace API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new { mensaje = error.Message });
             }
         }
-    
-#region Importar Datos
-[Authorize]
+
+        #region Importar Datos
+        [Authorize]
         [HttpGet]
         [Route("ImportarDatos")]
         public async Task<IActionResult> ImportarDatos()
@@ -198,7 +199,7 @@ namespace API.Controllers
                 var userId = GetUserId();
                 using (HttpClient client = new HttpClient())
                 {
-                    HttpResponseMessage response = await client.GetAsync("http://192.168.149.155/data");
+                    HttpResponseMessage response = await client.GetAsync("http://192.168.20.33/data");
                     response.EnsureSuccessStatusCode();
                     string responseBody = await response.Content.ReadAsStringAsync();
                     _logger.LogInformation($"Datos recibidos del servidor: {responseBody}");
@@ -250,13 +251,85 @@ namespace API.Controllers
             }
         }
 
-
         #region Servicio de fondo
-       
-            #endregion
+        public class MonitoreoBackgroundService : BackgroundService
+        {
+            private readonly ILogger<MonitoreoBackgroundService> _logger;
+            private readonly IServiceProvider _serviceProvider;
+            private readonly HttpClient _httpClient;
 
-            #region Servicio de datos
-            public interface IDataService
+            public MonitoreoBackgroundService(ILogger<MonitoreoBackgroundService> logger, IServiceProvider serviceProvider)
+            {
+                _logger = logger;
+                _serviceProvider = serviceProvider;
+                _httpClient = new HttpClient();
+            }
+
+            protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await ObtenerYGuardarDatos();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"Error en el servicio de fondo: {ex.Message}");
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+            }
+
+            private async Task ObtenerYGuardarDatos()
+            {
+                try
+                {
+                    var response = await _httpClient.GetAsync("http://192.168.20.33/data");
+                    response.EnsureSuccessStatusCode();
+                    var content = await response.Content.ReadAsStringAsync();
+
+                    _logger.LogInformation($"Datos recibidos: {content}");
+
+                    var monitoreo = JsonConvert.DeserializeObject<Monitoreo>(content);
+                    monitoreo.FechaHora = DateTime.Now;
+
+                    using (var scope = _serviceProvider.CreateScope())
+                    {
+                        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                        dbContext.Monitoreo.Add(monitoreo);
+                        await dbContext.SaveChangesAsync();
+                    }
+
+                    _logger.LogInformation($"Datos guardados: Temperatura={monitoreo.Temperatura}, TDS={monitoreo.tds}, PH={monitoreo.PH}, LoteID={monitoreo.LoteID}");
+                }
+                catch (HttpRequestException ex)
+                {
+                    _logger.LogError($"Error al obtener datos del endpoint: {ex.Message}");
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogError($"Error al deserializar los datos: {ex.Message}");
+                }
+                catch (DbUpdateException ex)
+                {
+                    _logger.LogError($"Error al guardar en la base de datos: {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        _logger.LogError($"Inner exception: {ex.InnerException.Message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error inesperado: {ex.Message}");
+                }
+            }
+        }
+        #endregion
+
+        #region Servicio de datos
+        public interface IDataService
         {
             void GuardarEnBaseDeDatos(Monitoreo datosSensor);
         }
