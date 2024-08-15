@@ -17,17 +17,20 @@ namespace API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
         private readonly IAuthService _authService;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
             IConfiguration configuration,
             IEmailService emailService,
             IAuthService authService)
         {
             _userManager = userManager;
+            _signInManager = signInManager;
             _configuration = configuration;
             _emailService = emailService;
             _authService = authService;
@@ -41,19 +44,31 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = new ApplicationUser { UserName = model.Username, Email = model.Email, EmailConfirmed = true };
+            // Verificar la clave de registro
+            if (model.RegistrationKey != _configuration["RegistrationKey"])
+            {
+                return BadRequest(new { success = false, message = "Invalid registration key" });
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                Address = model.Address,
+                FarmName = model.FarmName,
+                EmailConfirmed = true
+            };
             var result = await _userManager.CreateAsync(user, model.Password);
 
             if (result.Succeeded)
             {
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                user.Token = token;
-                await _userManager.UpdateAsync(user);
                 return Ok(new { success = true, message = "User registered successfully" });
             }
 
             return BadRequest(new { success = false, errors = result.Errors });
         }
+
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
@@ -63,10 +78,10 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = await _userManager.FindByNameAsync(model.Username);
+            var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
             {
-                var token = await GenerateJwtToken(user);
+                var token = GenerateJwtToken(user);
                 return Ok(new
                 {
                     success = true,
@@ -77,10 +92,10 @@ namespace API.Controllers
                 });
             }
 
-            return Unauthorized(new { success = false, message = "Invalid username or password" });
+            return Unauthorized(new { success = false, message = "Invalid email or password" });
         }
 
-        private async Task<string> GenerateJwtToken(ApplicationUser user)
+        private string GenerateJwtToken(ApplicationUser user)
         {
             var claims = new[]
             {
@@ -104,9 +119,9 @@ namespace API.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-    
 
-[HttpPost("forgot-password")]
+
+        [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword(ForgotPasswordModel model)
         {
             if (ModelState.IsValid)

@@ -32,7 +32,6 @@ builder.Services.AddCors(options =>
             .WithOrigins("http://localhost:4200")
             .AllowAnyMethod()
             .AllowAnyHeader());
-
     options.AddPolicy("ReglasCors", policy =>
     {
         policy.AllowAnyOrigin()
@@ -46,7 +45,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Identity configuration
-builder.Services.AddIdentity<API.Modelo.ApplicationUser, IdentityRole>()
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
 
@@ -70,14 +69,11 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Register EmailService
+// Register services
 builder.Services.AddScoped<IEmailService, EmailService>();
-
-// Register AuthService
 builder.Services.AddScoped<IAuthService, AuthService>();
-
-// Register other services as needed...
 builder.Services.AddScoped<IEspecieLoteService, EspecieLoteService>();
+builder.Services.AddScoped<UserService>(); // Register UserService
 
 var app = builder.Build();
 

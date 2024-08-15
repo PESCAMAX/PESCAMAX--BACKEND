@@ -10,7 +10,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         : base(options)
     {
     }
-  
+ 
+       
         public DbSet<EspecieLote> EspecieLote { get; set; }
     public DbSet<CrearEspecie> CrearEspecie { get; set; }
     // ... otros DbSet ...
