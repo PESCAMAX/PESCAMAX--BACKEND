@@ -9,8 +9,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using API.Data;
 using API.Modelo;
-using System.Text;
 using API.Controllers; // Asegúrate de que este using esté presente
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +21,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = null;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -44,12 +45,17 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddHostedService<MonitoreoController.MonitoreoBackgroundService>();
-
 // Identity configuration
-builder.Services.AddIdentity<API.Modelo.ApplicationUser, IdentityRole>()
-    .AddEntityFrameworkStores<ApplicationDbContext>()
-    .AddDefaultTokenProviders();
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequiredLength = 8;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
 
 // Authentication configuration
 builder.Services.AddAuthentication(options =>
@@ -71,14 +77,11 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Register EmailService
+// Register services
 builder.Services.AddScoped<IEmailService, EmailService>();
-
-// Register AuthService
 builder.Services.AddScoped<IAuthService, AuthService>();
-
-// Register other services as needed...
 builder.Services.AddScoped<IEspecieLoteService, EspecieLoteService>();
+builder.Services.AddScoped<UserService>(); // Register UserService
 
 // Add the background service
 builder.Services.AddHostedService<MonitoreoController.MonitoreoBackgroundService>();

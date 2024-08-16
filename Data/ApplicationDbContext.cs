@@ -11,7 +11,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<EspecieLote> EspecieLote { get; set; }
     public DbSet<CrearEspecie> CrearEspecie { get; set; }
-    // ... otros DbSet ...
     public DbSet<Alerta> Alertas { get; set; }
     public DbSet<Producto> Productos { get; set; }
     public DbSet<Orden> Órdenes { get; set; }
@@ -25,6 +24,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>()
+            .Property(u => u.RequirePasswordChange)
+            .HasDefaultValue(false);
 
         modelBuilder.Entity<DetalleOrden>()
             .HasKey(d => d.DetalleOrdenId);

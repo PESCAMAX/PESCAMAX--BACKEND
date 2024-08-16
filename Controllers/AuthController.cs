@@ -9,6 +9,7 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using API.Data;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API.Controllers
 {
@@ -17,17 +18,20 @@ namespace API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
         private readonly IAuthService _authService;
 
         public AuthController(
             UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
             IConfiguration configuration,
             IEmailService emailService,
             IAuthService authService)
         {
             _userManager = userManager;
+            _signInManager = signInManager;
             _configuration = configuration;
             _emailService = emailService;
             _authService = authService;
@@ -41,19 +45,37 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = new ApplicationUser { UserName = model.Username, Email = model.Email, EmailConfirmed = true };
-            var result = await _userManager.CreateAsync(user, model.Password);
+            // Verify the registration key
+
+
+            // Generate a random password
+            string generatedPassword = GenerateRandomPassword();
+
+            var user = new ApplicationUser
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                Address = model.Address,
+                FarmName = model.FarmName,
+                EmailConfirmed = true,
+                RequirePasswordChange = true
+            };
+
+            var result = await _userManager.CreateAsync(user, generatedPassword);
 
             if (result.Succeeded)
             {
-                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                user.Token = token;
-                await _userManager.UpdateAsync(user);
-                return Ok(new { success = true, message = "User registered successfully" });
+                // Send email with generated password
+                await _emailService.SendEmailAsync(user.Email, "Your Account Password",
+                    $"Your account has been created. Your temporary password is: {generatedPassword}. Please change your password upon first login.");
+
+                return Ok(new { success = true, message = "User registered successfully. Check your email for the temporary password." });
             }
 
             return BadRequest(new { success = false, errors = result.Errors });
         }
+
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
@@ -63,24 +85,25 @@ namespace API.Controllers
                 return BadRequest(ModelState);
             }
 
-            var user = await _userManager.FindByNameAsync(model.Username);
+            var user = await _userManager.FindByEmailAsync(model.Email);
             if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
             {
-                var token = await GenerateJwtToken(user);
-                return Ok(new
+                var token = GenerateJwtToken(user);
+                return Ok(new LoginResponse
                 {
-                    success = true,
-                    token = token,
-                    userId = user.Id,
-                    username = user.UserName,
-                    message = "Login successful"
+                    Success = true,
+                    Token = token,
+                    UserId = user.Id,
+                    Username = user.UserName,
+                    RequirePasswordChange = user.RequirePasswordChange,
+                    Message = user.RequirePasswordChange ? "Login successful. Please change your password." : "Login successful"
                 });
             }
 
-            return Unauthorized(new { success = false, message = "Invalid username or password" });
+            return Unauthorized(new LoginResponse { Success = false, Message = "Invalid email or password" });
         }
 
-        private async Task<string> GenerateJwtToken(ApplicationUser user)
+        private string GenerateJwtToken(ApplicationUser user)
         {
             var claims = new[]
             {
@@ -104,9 +127,9 @@ namespace API.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-    
 
-[HttpPost("forgot-password")]
+
+        [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword(ForgotPasswordModel model)
         {
             if (ModelState.IsValid)
@@ -159,9 +182,71 @@ namespace API.Controllers
 
             return BadRequest(new { message = "No se pudo restablecer la contraseña.", errors = result.Errors });
         }
+        private string GenerateRandomPassword()
+        {
+            const string upperCase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const string lowerCase = "abcdefghijklmnopqrstuvwxyz";
+            const string numeric = "0123456789";
+            const string special = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+
+            var random = new Random();
+            var password = new StringBuilder();
+
+            // Asegúrate de incluir al menos un carácter de cada tipo
+            password.Append(upperCase[random.Next(upperCase.Length)]);
+            password.Append(lowerCase[random.Next(lowerCase.Length)]);
+            password.Append(numeric[random.Next(numeric.Length)]);
+            password.Append(special[random.Next(special.Length)]);
+
+            // Completa el resto de la contraseña
+            while (password.Length < 12)
+            {
+                var set = random.Next(4);
+                switch (set)
+                {
+                    case 0:
+                        password.Append(upperCase[random.Next(upperCase.Length)]);
+                        break;
+                    case 1:
+                        password.Append(lowerCase[random.Next(lowerCase.Length)]);
+                        break;
+                    case 2:
+                        password.Append(numeric[random.Next(numeric.Length)]);
+                        break;
+                    case 3:
+                        password.Append(special[random.Next(special.Length)]);
+                        break;
+                }
+            }
+
+            return new string(password.ToString().ToCharArray().OrderBy(x => random.Next()).ToArray());
+        }
+
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var user = await _userManager.FindByIdAsync(userId);
+
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found." });
+            }
+
+            var changePasswordResult = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
+            if (!changePasswordResult.Succeeded)
+            {
+                return BadRequest(new { message = "Failed to change password.", errors = changePasswordResult.Errors });
+            }
+
+            user.RequirePasswordChange = false;
+            await _userManager.UpdateAsync(user);
+
+            return Ok(new { message = "Password changed successfully." });
+        }
     }
 }
-
 
 
 
