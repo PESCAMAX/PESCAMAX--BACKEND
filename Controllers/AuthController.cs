@@ -89,18 +89,18 @@ namespace API.Controllers
             if (user != null && await _userManager.CheckPasswordAsync(user, model.Password))
             {
                 var token = GenerateJwtToken(user);
-                return Ok(new LoginResponse
+
+                // Devuelve la respuesta con la estructura esperada
+                return Ok(new
                 {
                     Success = true,
                     Token = token,
                     UserId = user.Id,
-                    Username = user.UserName,
-                    RequirePasswordChange = user.RequirePasswordChange,
-                    Message = user.RequirePasswordChange ? "Login successful. Please change your password." : "Login successful"
+                    RequirePasswordChange = user.RequirePasswordChange
                 });
             }
 
-            return Unauthorized(new LoginResponse { Success = false, Message = "Invalid email or password" });
+            return Unauthorized(new { message = "Invalid login attempt." });
         }
 
         private string GenerateJwtToken(ApplicationUser user)
@@ -226,28 +226,30 @@ namespace API.Controllers
         [Authorize]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordModel model)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var user = await _userManager.FindByIdAsync(userId);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized();
+            }
 
+            var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
-                return NotFound(new { message = "User not found." });
+                return NotFound(new { success = false, message = "User not found." });
             }
 
             var changePasswordResult = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
-            if (!changePasswordResult.Succeeded)
+            if (changePasswordResult.Succeeded)
             {
-                return BadRequest(new { message = "Failed to change password.", errors = changePasswordResult.Errors });
+                user.RequirePasswordChange = false;
+                await _userManager.UpdateAsync(user);
+                return Ok(new { success = true, message = "Password changed successfully." });
             }
 
-            user.RequirePasswordChange = false;
-            await _userManager.UpdateAsync(user);
-
-            return Ok(new { message = "Password changed successfully." });
+            return BadRequest(new { success = false, errors = changePasswordResult.Errors });
         }
     }
 }
-
 
 
 

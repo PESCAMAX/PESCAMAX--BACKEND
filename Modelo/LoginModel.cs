@@ -9,10 +9,10 @@
     public class LoginResponse
     {
         public bool Success { get; set; }
-        public string Token { get; set; }
-        public string UserId { get; set; }
-        public string Username { get; set; }
-        public bool RequirePasswordChange { get; set; }
+        public string token { get; set; } // Cambiar a "token"
+        public string userId { get; set; } // Cambiar a "userId"
+        public bool requirePasswordChange { get; set; } // Cambiar a "requirePasswordChange"
         public string Message { get; set; }
     }
+
 }
