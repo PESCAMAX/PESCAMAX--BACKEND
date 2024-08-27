@@ -11,6 +11,8 @@ using API.Data;
 using API.Modelo;
 using API.Controllers; // Asegúrate de que este using esté presente
 using System.Text;
+using Microsoft.AspNetCore.Authentication.Cookies;
+
 
 var builder = WebApplication.CreateBuilder(args);
 

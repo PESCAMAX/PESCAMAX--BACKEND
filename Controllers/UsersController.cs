@@ -1,67 +1,48 @@
-﻿using API.Data;
-using API.Modelo;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using API.Modelo;
 
 namespace API.Controllers
 {
     [Route("api/[controller]")]
+    [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> _userManager;
+        private readonly UserService _userService;
 
-        public UsersController(UserService userService, Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> userManager)
+        public UsersController(UserService userService)
         {
-            _userManager = userManager;
+            _userService = userService;
         }
 
-
-
-        [Authorize]
-        [HttpPut("update")]
-        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserModel model)
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized();
-            }
-
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            // Update user properties
-            user.PhoneNumber = model.PhoneNumber;
-            user.Address = model.Address;
-            user.FarmName = model.FarmName;
-
-            var result = await _userManager.UpdateAsync(user);
+            var result = await _userService.PasswordSignInAsync(model.Username, model.Password);
             if (result.Succeeded)
             {
-                return Ok(new { message = "User updated successfully" });
+                return Ok(new { message = "Login successful" });
             }
+            return Unauthorized(new { message = "Invalid login attempt" });
+        }
 
-            return BadRequest(new { message = "User update failed", errors = result.Errors });
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            await _userService.SignOutAsync();
+            return Ok(new { message = "Logout successful" });
         }
 
         [Authorize]
         [HttpGet("current")]
         public async Task<IActionResult> GetCurrentUser()
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized();
-            }
-
-            var user = await _userManager.FindByIdAsync(userId);
+            var user = await _userService.GetAuthenticatedUserAsync(User);
             if (user == null)
             {
-                return NotFound();
+                return NotFound(new { message = "User not found" });
             }
 
             return Ok(new
@@ -74,5 +55,52 @@ namespace API.Controllers
             });
         }
 
+        [Authorize]
+        [HttpPut("update")]
+        public async Task<IActionResult> UpdateUser([FromBody] UpdateUserModel model)
+        {
+            var user = await _userService.GetAuthenticatedUserAsync(User);
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            var result = await _userService.UpdateUserAsync(user, model);
+            if (result.Succeeded)
+            {
+                return Ok(new { message = "User updated successfully" });
+            }
+            return BadRequest(new { message = "User update failed", errors = result.Errors });
+        }
+
+        // Este método es un ejemplo de cómo manejar rutas que contienen un userId
+        [Authorize]
+        [HttpGet("{userId}")]
+        public async Task<IActionResult> GetUserById(string userId)
+        {
+            // Verificamos si el usuario autenticado tiene permiso para acceder a esta información
+            if (!await _userService.IsUserAuthenticated(User))
+            {
+                return Unauthorized(new { message = "Authentication required" });
+            }
+
+            // Aquí podrías agregar lógica adicional para verificar si el usuario autenticado
+            // tiene permiso para acceder a la información de userId específico
+
+            var user = await _userService.GetAuthenticatedUserAsync(User);
+            if (user == null || user.Id != userId)
+            {
+                return Forbid(new { message = "Access denied" });
+            }
+
+            return Ok(new
+            {
+                user.UserName,
+                user.Email,
+                user.PhoneNumber,
+                user.Address,
+                user.FarmName
+            });
+        }
     }
 }
