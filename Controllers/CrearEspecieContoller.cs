@@ -44,13 +44,11 @@ namespace API.Controllers
                     return Unauthorized();
                 }
 
-                // Verificar que el userId en la URL coincida con el usuario autenticado
                 if (userId != authenticatedUserId)
                 {
                     return Forbid();
                 }
 
-                // Resto de la lógica para crear la especie
                 using (var conexion = new SqlConnection(_cadenaSQL))
                 {
                     await conexion.OpenAsync();
@@ -68,6 +66,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", crearEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", crearEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", crearEspecie.PhMaximo);
+                        cmd.Parameters.AddWithValue("@Cantidad", crearEspecie.Cantidad);
                         cmd.Parameters.AddWithValue("@UserId", authenticatedUserId);
 
                         await cmd.ExecuteNonQueryAsync();
@@ -118,6 +117,7 @@ namespace API.Controllers
                         cmd.Parameters.AddWithValue("@TemperaturaMaximo", modificarEspecie.TemperaturaMaximo);
                         cmd.Parameters.AddWithValue("@PhMinimo", modificarEspecie.PhMinimo);
                         cmd.Parameters.AddWithValue("@PhMaximo", modificarEspecie.PhMaximo);
+                        cmd.Parameters.AddWithValue("@Cantidad", modificarEspecie.Cantidad);
                         cmd.Parameters.AddWithValue("@UserId", userId);
 
                         await cmd.ExecuteNonQueryAsync();
@@ -208,7 +208,8 @@ namespace API.Controllers
                                 TemperaturaMinimo = (float)reader.GetDouble(4),
                                 TemperaturaMaximo = (float)reader.GetDouble(5),
                                 PhMinimo = (float)reader.GetDouble(6),
-                                PhMaximo = (float)reader.GetDouble(7)
+                                PhMaximo = (float)reader.GetDouble(7),
+                                Cantidad = reader.GetInt32(8)
                             });
                         }
                     }

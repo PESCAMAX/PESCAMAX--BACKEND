@@ -1,9 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
-
 namespace API.Modelo
 {
-
     public class CrearEspecie
     {
         public int Id { get; set; }
@@ -14,9 +12,7 @@ namespace API.Modelo
         public float TemperaturaMaximo { get; set; }
         public float PhMinimo { get; set; }
         public float PhMaximo { get; set; }
-        public string UserId { get; set; } // Propiedad para almacenar el token del usuario
+        public int Cantidad { get; set; } // Nuevo campo
+        public string UserId { get; set; }
     }
-
 }
-
-
