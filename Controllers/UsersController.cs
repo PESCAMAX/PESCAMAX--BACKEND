@@ -1,4 +1,4 @@
-﻿using API.Data;
+using API.Data;
 using API.Modelo;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,12 +11,10 @@ namespace API.Controllers
     {
         private readonly Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> _userManager;
 
-        public UsersController(UserService userService, Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> userManager)
+        public UsersController(Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> userManager)
         {
             _userManager = userManager;
         }
-
-
 
         [Authorize]
         [HttpPut("update")]
@@ -34,17 +32,19 @@ namespace API.Controllers
                 return NotFound();
             }
 
-            // Update user properties
-            user.PhoneNumber = model.PhoneNumber;
-            user.Address = model.Address;
-            user.FarmName = model.FarmName;
+            // Update user properties only if they are provided
+            if (model.PhoneNumber != null)
+                user.PhoneNumber = model.PhoneNumber;
+            if (model.Address != null)
+                user.Address = model.Address;
+            if (model.FarmName != null)
+                user.FarmName = model.FarmName;
 
             var result = await _userManager.UpdateAsync(user);
             if (result.Succeeded)
             {
                 return Ok(new { message = "User updated successfully" });
             }
-
             return BadRequest(new { message = "User update failed", errors = result.Errors });
         }
 
@@ -73,6 +73,5 @@ namespace API.Controllers
                 user.FarmName
             });
         }
-
     }
 }
