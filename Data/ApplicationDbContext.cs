@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<MétodoPago> MétodosPago { get; set; }
     public DbSet<Monitoreo> Monitoreo { get; set; }
     public DbSet<HorasSeleccionadas> HorasSeleccionadas { get; set; }
+    public DbSet<SensorData> SensorData { get; set; } // Añade esta línea
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +68,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.LoteID).IsRequired();
             entity.Property(e => e.userId).IsRequired();
         });
+
+        modelBuilder.Entity<SensorData>()
+            .HasKey(sd => sd.Id); // Configura 'Id' como la clave primaria
 
         // Configuraciones adicionales si es necesario
     }

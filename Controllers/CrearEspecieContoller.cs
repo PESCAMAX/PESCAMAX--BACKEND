@@ -197,19 +197,25 @@ namespace API.Controllers
                     var especies = new List<CrearEspecie>();
                     using (var reader = await cmd.ExecuteReaderAsync())
                     {
+                        if (!reader.HasRows)
+                        {
+                            _logger.LogInformation($"No species found for user {userId}");
+                            return Ok(new List<CrearEspecie>());
+                        }
+
                         while (await reader.ReadAsync())
                         {
                             especies.Add(new CrearEspecie
                             {
                                 Id = reader.GetInt32(0),
-                                NombreEspecie = reader.GetString(1),
-                                TdsMinimo = (float)reader.GetDouble(2),
-                                TdsMaximo = (float)reader.GetDouble(3),
-                                TemperaturaMinimo = (float)reader.GetDouble(4),
-                                TemperaturaMaximo = (float)reader.GetDouble(5),
-                                PhMinimo = (float)reader.GetDouble(6),
-                                PhMaximo = (float)reader.GetDouble(7),
-                                Cantidad = reader.GetInt32(8)
+                                NombreEspecie = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
+                                TdsMinimo = reader.IsDBNull(2) ? 0 : (float)reader.GetDouble(2),
+                                TdsMaximo = reader.IsDBNull(3) ? 0 : (float)reader.GetDouble(3),
+                                TemperaturaMinimo = reader.IsDBNull(4) ? 0 : (float)reader.GetDouble(4),
+                                TemperaturaMaximo = reader.IsDBNull(5) ? 0 : (float)reader.GetDouble(5),
+                                PhMinimo = reader.IsDBNull(6) ? 0 : (float)reader.GetDouble(6),
+                                PhMaximo = reader.IsDBNull(7) ? 0 : (float)reader.GetDouble(7),
+                                Cantidad = reader.IsDBNull(8) ? 0 : reader.GetInt32(8)
                             });
                         }
                     }
@@ -219,8 +225,9 @@ namespace API.Controllers
             }
             catch (Exception error)
             {
-                _logger.LogError($"Error en Listar: {error.Message}");
-                return StatusCode(500, new { mensaje = error.Message });
+                _logger.LogError($"Error in Listar: {error.Message}");
+                _logger.LogError($"Stack Trace: {error.StackTrace}");
+                return StatusCode(500, new { mensaje = "Error interno del servidor al listar especies." });
             }
         }
     }

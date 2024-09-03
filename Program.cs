@@ -82,6 +82,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEspecieLoteService, EspecieLoteService>();
 builder.Services.AddScoped<UserService>(); // Register UserService
+builder.Services.AddHttpClient();
 
 // Add the background service
 builder.Services.AddHostedService<MonitoreoController.MonitoreoBackgroundService>();
