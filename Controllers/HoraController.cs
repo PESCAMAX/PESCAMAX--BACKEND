@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -90,7 +91,7 @@ namespace API.Controllers
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var client = _clientFactory.CreateClient();
-            var response = await client.PostAsync("http://192.168.130.155/setHours", content);
+            var response = await client.PostAsync("http://192.168.1.12/setHours", content);
 
             if (response.IsSuccessStatusCode)
             {
@@ -119,6 +120,25 @@ namespace API.Controllers
             }
         }
 
+        [HttpGet("obtenerHoras")]
+        public async Task<IActionResult> ObtenerHoras()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                var horasGuardadas = await _context.HorasSeleccionadas
+                    .Where(h => h.UserId == userId)
+                    .Select(h => new { h.Hour, h.Am, h.Pm })
+                    .ToListAsync();
+
+                return Ok(new { mensaje = "Horas recuperadas exitosamente", horas = horasGuardadas });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error al obtener las horas guardadas: {ex.Message}");
+                return StatusCode(500, "Error al obtener las horas guardadas.");
+            }
+        }
         public class HourSelection
         {
             public int hour { get; set; }
