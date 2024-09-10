@@ -9,7 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using API.Data;
 using API.Modelo;
-using API.Controllers; // Asegúrate de que este using esté presente
+using API.Controllers;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,19 +33,11 @@ builder.Services.AddCors(options =>
             .WithOrigins("http://localhost:4200")
             .AllowAnyMethod()
             .AllowAnyHeader());
-    options.AddPolicy("ReglasCors", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
 });
 
-// Database context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Identity configuration
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.Password.RequireDigit = true;
@@ -57,7 +49,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Authentication configuration
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -77,18 +68,15 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// Register services
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEspecieLoteService, EspecieLoteService>();
-builder.Services.AddScoped<UserService>(); // Register UserService
+builder.Services.AddScoped<UserService>();
 
-// Add the background service
 builder.Services.AddHostedService<MonitoreoController.MonitoreoBackgroundService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -101,7 +89,6 @@ app.UseRouting();
 
 // Apply CORS
 app.UseCors("AllowSpecificOrigin");
-app.UseCors("ReglasCors");
 
 app.UseAuthentication();
 app.UseAuthorization();

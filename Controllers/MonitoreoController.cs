@@ -199,7 +199,7 @@ namespace API.Controllers
                 var userId = GetUserId();
                 using (HttpClient client = new HttpClient())
                 {
-                    HttpResponseMessage response = await client.GetAsync("http://192.168.20.33/data");
+                    HttpResponseMessage response = await client.GetAsync("http://192.168.43.110/data");
                     response.EnsureSuccessStatusCode();
                     string responseBody = await response.Content.ReadAsStringAsync();
                     _logger.LogInformation($"Datos recibidos del servidor: {responseBody}");
@@ -286,7 +286,7 @@ namespace API.Controllers
             {
                 try
                 {
-                    var response = await _httpClient.GetAsync("http://192.168.20.33/data");
+                    var response = await _httpClient.GetAsync("http://192.168.43.110/data");
                     response.EnsureSuccessStatusCode();
                     var content = await response.Content.ReadAsStringAsync();
 
