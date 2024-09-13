@@ -39,7 +39,6 @@ namespace API.Controllers
 
             return Ok();
         }
-
         [HttpGet("{userId}")]
         public IActionResult ObtenerClima(string userId)
         {
@@ -70,6 +69,44 @@ namespace API.Controllers
             }
 
             return Ok(climas);
+        }
+
+
+
+        [HttpGet("ultimo/{userId}")]
+        public IActionResult ObtenerUltimoClima(string userId)
+        {
+            Clima ultimoClima = null;
+
+            using (SqlConnection connection = new SqlConnection(_cadenaSQL))
+            {
+                SqlCommand command = new SqlCommand("SELECT TOP 1 * FROM Clima WHERE UserId = @UserId ORDER BY FechaHora DESC", connection);
+                command.Parameters.AddWithValue("@UserId", userId);
+
+                connection.Open();
+                SqlDataReader reader = command.ExecuteReader();
+                if (reader.Read())
+                {
+                    ultimoClima = new Clima
+                    {
+                        NombreCiudad = reader["NombreCiudad"].ToString(),
+                        TemperaturaActual = Convert.ToDouble(reader["TemperaturaActual"]),
+                        EstadoMeteoro = reader["EstadoMeteoro"].ToString(),
+                        Humedad = Convert.ToInt32(reader["Humedad"]),
+                        Nubes = Convert.ToInt32(reader["Nubes"]),
+                        FechaHora = Convert.ToDateTime(reader["FechaHora"]),
+                        UserId = reader["UserId"].ToString()
+                    };
+                }
+                connection.Close();
+            }
+
+            if (ultimoClima == null)
+            {
+                return NotFound("No climate data available.");
+            }
+
+            return Ok(ultimoClima);
         }
     }
 }
